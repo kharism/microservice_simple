@@ -1,0 +1,5 @@
+{
+    "uri":"mongodb://localhost",
+    "db":"micro_simple",
+    "address":"localhost:8098"
+}
