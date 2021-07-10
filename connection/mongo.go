@@ -15,7 +15,7 @@ var (
 	connectionString string
 )
 
-// NewConnection load database connection configuration
+// NewClient return mongo client stuff. You need to close the connection yourself once done.
 func NewClient() (*mongo.Client, error) {
 	connectionString := viper.GetString("uri")
 

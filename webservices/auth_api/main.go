@@ -3,6 +3,9 @@ package main
 import (
 	//"kano/simwas/pkg/middleware"
 
+	"net/http"
+	"os"
+
 	"github.com/go-chi/chi"
 	chiMiddleware "github.com/go-chi/chi/middleware"
 	"github.com/go-chi/cors"
@@ -47,6 +50,9 @@ func main() {
 		ForceColors:   debugging,
 		FullTimestamp: true,
 	})
+	log.SetOutput(os.Stdout)
+	log.Info("server api run on DEBUG mode")
+	log.SetLevel(log.DebugLevel)
 
 	r.Use(chiMiddleware.RequestID)
 
@@ -68,4 +74,19 @@ func main() {
 	r.Group(func(r chi.Router) {
 		r.Mount("/auth", authAPI.Register())
 	})
+	walkFunc := func(method string, route string, handler http.Handler, middlewares ...func(http.Handler) http.Handler) error {
+		log.Debugf("[%s] %s", method, route)
+		return nil
+	}
+
+	if err := chi.Walk(r, walkFunc); err != nil {
+		log.Errorf("walk function error : %s\n", err.Error())
+	}
+
+	serverAddress := viper.GetString("address")
+	log.Infof("server api run at %s", serverAddress)
+	err := http.ListenAndServe(serverAddress, r)
+	if err != nil {
+		log.Fatal("unable to start web server", err.Error())
+	}
 }

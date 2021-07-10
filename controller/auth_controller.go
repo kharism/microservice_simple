@@ -21,18 +21,23 @@ import (
 const jwtKeyID = "_id"
 
 // IAuthRestAPI user controller interface
+// RegisterUser -> the register user request handler
+// VerifyLogin  -> this is the one handling login request
 type IAuthRestAPI interface {
 	VerifyLogin(w http.ResponseWriter, r *http.Request)
 	RegisterUser(w http.ResponseWriter, r *http.Request)
 	Register() http.Handler
 }
 
+// authentication controller struct
+// simple implementation with mongodb backend as prototyping backend
 type authController struct {
 	tokenAuth *jwtauth.JWTAuth
 	auth      func() service.IAuth
 	//rkas      func() service.IRKAS
 }
 
+// create new auth controller
 func NewAuth(tokenAuth *jwtauth.JWTAuth) IAuthRestAPI {
 	return &authController{
 		auth: service.NewAuth,
@@ -40,6 +45,8 @@ func NewAuth(tokenAuth *jwtauth.JWTAuth) IAuthRestAPI {
 		tokenAuth: tokenAuth,
 	}
 }
+
+// handler for register new user
 func (c *authController) RegisterUser(w http.ResponseWriter, r *http.Request) {
 	data := model.User{}
 
@@ -56,6 +63,9 @@ func (c *authController) RegisterUser(w http.ResponseWriter, r *http.Request) {
 	response["IsError"] = false
 	util.WriteJSONData(w, response)
 }
+
+// handler for login. On success login return the userdata with JWT Token.
+// Probably need to remove unneccessary field due to security reason
 func (c *authController) VerifyLogin(w http.ResponseWriter, r *http.Request) {
 	var (
 		user model.User
