@@ -33,6 +33,10 @@ func NewItem(token *jwtauth.JWTAuth) IItemRestAPI {
 	}
 }
 
+// get item
+// http method: GET
+// router : /{id}
+// payload: none
 func (c *itemController) GetItem(w http.ResponseWriter, r *http.Request) {
 	id := util.URLParam(r, "id")
 	item, err := c.item().FindById(id)
@@ -41,6 +45,11 @@ func (c *itemController) GetItem(w http.ResponseWriter, r *http.Request) {
 	}
 	util.WriteJSONData(w, item)
 }
+
+// 'delete' item. Its not really deleted, just hidden from basic query
+// http method: DELETE
+// router : /{id}
+// payload: none
 func (c *itemController) HideItem(w http.ResponseWriter, r *http.Request) {
 	id := util.URLParam(r, "id")
 	err := c.item().HideById(id)
@@ -55,6 +64,13 @@ type requestPayload struct {
 	Take int64
 }
 
+// get items as list
+// http method: GET
+// router : /list
+// payload: {
+// 	Skip int64
+//  Take int64
+// }
 func (c *itemController) GetItems(w http.ResponseWriter, r *http.Request) {
 	items := []model.Item{}
 	param := requestPayload{}
@@ -74,6 +90,14 @@ func (c *itemController) GetItems(w http.ResponseWriter, r *http.Request) {
 	}
 	util.WriteJSONDataWithTotal(w, items, count)
 }
+
+// save items as list
+// http method: PUT
+// router : /pop/{id} for PUT
+// payload: {
+//    ItemId string
+//    Amount int64
+// }
 func (c *itemController) SaveItem(w http.ResponseWriter, r *http.Request) {
 	userID, err := util.GetClaimStringFromJWT(r, jwtKeyID)
 	if err != nil {

@@ -37,6 +37,10 @@ func NewCart(token *jwtauth.JWTAuth) ICartRestAPI {
 	}
 }
 
+// get cart by id
+// http method: GET
+// router /{id}
+// payload: None
 func (c *cartController) GetCart(w http.ResponseWriter, r *http.Request) {
 	id := util.URLParam(r, "id")
 	item, err := c.cart().FindById(id)
@@ -46,6 +50,13 @@ func (c *cartController) GetCart(w http.ResponseWriter, r *http.Request) {
 	util.WriteJSONData(w, item)
 }
 
+// get carts by id
+// http method: POST
+// router /list
+// payload: {
+//	Skip int64
+//	Take int64
+// }
 func (c *cartController) GetCarts(w http.ResponseWriter, r *http.Request) {
 	items := []model.Cart{}
 	param := requestPayload{}
@@ -65,6 +76,11 @@ func (c *cartController) GetCarts(w http.ResponseWriter, r *http.Request) {
 	}
 	util.WriteJSONDataWithTotal(w, items, count)
 }
+
+// get carts by id
+// http method: POST or PUT
+// router / for POST /{id} for PUT
+// payload: follow th cart model
 func (c *cartController) SaveCart(w http.ResponseWriter, r *http.Request) {
 	userID, err := util.GetClaimStringFromJWT(r, jwtKeyID)
 	if err != nil {
@@ -91,6 +107,13 @@ type AddItemPayload struct {
 	Amount int64
 }
 
+// add item to cart
+// http method: PUT
+// router : /push/{id} for PUT
+// payload: {
+//    ItemId string
+//    Amount int64
+//}
 func (c *cartController) AddItemToCart(w http.ResponseWriter, r *http.Request) {
 	id := util.URLParam(r, "id")
 	item, err := c.cart().FindById(id)
@@ -123,6 +146,14 @@ func (c *cartController) AddItemToCart(w http.ResponseWriter, r *http.Request) {
 	}
 	util.WriteJSONData(w, item, "Success Add Item")
 }
+
+// add item to cart
+// http method: PUT
+// router : /pop/{id} for PUT
+// payload: {
+//    ItemId string
+//    Amount int64
+//}
 func (c *cartController) RemoveItemFromCart(w http.ResponseWriter, r *http.Request) {
 	id := util.URLParam(r, "id")
 	item, err := c.cart().FindById(id)

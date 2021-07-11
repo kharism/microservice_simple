@@ -47,6 +47,11 @@ func NewAuth(tokenAuth *jwtauth.JWTAuth) IAuthRestAPI {
 }
 
 // handler for register new user
+// payload :
+// {
+//	"Username":"string",
+//  "Password":"string",
+// }
 func (c *authController) RegisterUser(w http.ResponseWriter, r *http.Request) {
 	data := model.User{}
 
@@ -66,6 +71,15 @@ func (c *authController) RegisterUser(w http.ResponseWriter, r *http.Request) {
 
 // handler for login. On success login return the userdata with JWT Token.
 // Probably need to remove unneccessary field due to security reason
+// payload :
+// {
+//	"Username":"string",
+//  "Password":"string",
+// }
+// response: json representation of the User struct with Token field filled with JWTAuth token
+// Some service in the microserve will require JWT Token as authentication method
+// use the token as HTTP Header "Authorization" with value "BEARER "+token
+// for more example refer to TestItems functions on auth_controller_test.go
 func (c *authController) VerifyLogin(w http.ResponseWriter, r *http.Request) {
 	var (
 		user model.User
