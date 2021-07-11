@@ -36,7 +36,10 @@ func init() {
 		panic(err)
 	}
 	debugging = viper.GetBool(`debug`)
-
+	mongourl := os.Getenv("MONGO_URI")
+	if mongourl != "" {
+		viper.Set("uri", mongourl)
+	}
 	// Log as JSON instead of the default ASCII formatter.
 	log.SetFormatter(&log.TextFormatter{
 		ForceColors:   debugging,

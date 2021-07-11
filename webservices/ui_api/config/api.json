@@ -1,6 +1,6 @@
 {
     "uri":"mongodb://localhost",
     "db":"micro_simple",
-    "address":"localhost:8100",
+    "address":"0.0.0.0:8100",
     "jwt_expiration_duration":3600
 }
