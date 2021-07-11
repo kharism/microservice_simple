@@ -31,7 +31,10 @@ func init() {
 	viper.SetConfigType("json")
 	viper.AddConfigPath("./config/")
 	viper.AddConfigPath("../../config/")
-
+	err := viper.ReadInConfig()
+	if err != nil {
+		panic(err)
+	}
 	debugging = viper.GetBool(`debug`)
 
 	// Log as JSON instead of the default ASCII formatter.

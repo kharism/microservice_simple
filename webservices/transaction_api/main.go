@@ -19,7 +19,7 @@ var (
 	token     *jwtauth.JWTAuth
 )
 var (
-	itemAPI controller.IItemRestAPI
+	cartAPI controller.ICartRestAPI
 )
 
 func init() {
@@ -29,6 +29,7 @@ func init() {
 	viper.SetConfigType("json")
 	viper.AddConfigPath("./config/")
 	viper.AddConfigPath("../../config/")
+	viper.ReadInConfig()
 	err := viper.ReadInConfig()
 	if err != nil {
 		panic(err)
@@ -40,7 +41,7 @@ func init() {
 		ForceColors:   debugging,
 		FullTimestamp: true,
 	})
-	itemAPI = controller.NewItem(token)
+	cartAPI = controller.NewCart(token)
 }
 
 func main() {
@@ -73,7 +74,7 @@ func main() {
 		MaxAge:           300,
 	}).Handler)
 	r.Group(func(r chi.Router) {
-		r.Mount("/item", itemAPI.Register())
+		r.Mount("/cart", cartAPI.Register())
 	})
 	walkFunc := func(method string, route string, handler http.Handler, middlewares ...func(http.Handler) http.Handler) error {
 		log.Debugf("[%s] %s", method, route)
