@@ -39,6 +39,7 @@ func init() {
 	}
 	//start webservice
 	authAPI := NewAuth(token)
+	itemAPI := NewItem(token)
 	r := chi.NewRouter()
 
 	logger := logrus.New()
@@ -69,7 +70,9 @@ func init() {
 	}).Handler)
 	r.Group(func(r chi.Router) {
 		r.Get("/ping", ping)
+		//r.Use(jwtauth.Verifier(token))
 		r.Mount("/auth", authAPI.Register())
+		r.Mount("/item", itemAPI.Register())
 	})
 
 	walkFunc := func(method string, route string, handler http.Handler, middlewares ...func(http.Handler) http.Handler) error {
@@ -169,5 +172,120 @@ func TestCreateUser(t *testing.T) {
 			})
 		})
 
+	})
+}
+func AddRequestBearer(req *http.Request, token string) {
+	req.Header.Add("Authorization", "BEARER "+token)
+}
+func TestItems(t *testing.T) {
+	userModel := model.User{}
+	itemModel := model.Item{}
+	Convey("Clean up", t, func() {
+		cli1, err := db.NewClient()
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		_, err = cli1.Database(viper.GetString("db")).Collection(userModel.TableName()).DeleteMany(ctx, bson.M{})
+		So(err, ShouldBeNil)
+		_, err = cli1.Database(viper.GetString("db")).Collection(itemModel.TableName()).DeleteMany(ctx, bson.M{})
+		So(err, ShouldBeNil)
+		payload := toolkit.M{}
+		client := &http.Client{}
+		//create basic user
+		payload["Username"] = "admin"
+		payload["Password"] = "PasswordXX"
+		payloadReader := strings.NewReader(toolkit.JsonString(payload))
+
+		resp, err := client.Post("http://localhost:8098/auth/registeruser", "application/json", payloadReader)
+		So(err, ShouldBeNil)
+		So(resp, ShouldNotBeNil)
+		So(resp.StatusCode, ShouldEqual, 200)
+		//login
+		payload["Username"] = "admin"
+		payload["Password"] = "PasswordXX"
+		payloadReader = strings.NewReader(toolkit.JsonString(payload))
+		resp, err = client.Post("http://localhost:8098/auth", "application/json", payloadReader)
+		So(err, ShouldBeNil)
+		So(resp, ShouldNotBeNil)
+		So(resp.StatusCode, ShouldEqual, 200)
+
+		responseJson, err := ProcessResponse(resp)
+		So(err, ShouldBeNil)
+		So(responseJson, ShouldNotBeNil)
+		//t.Log(responseJson)
+		token := responseJson["Data"].(map[string]interface{})["Token"].(string)
+		Convey("Test Item API", func() {
+			//create item without login should fail
+			itemModel.ID = ""
+			itemModel.ProductName = "LLL1212"
+			itemModel.Price = 10.0
+			itemModel.Visible = true
+			payloadReader = strings.NewReader(toolkit.JsonString(itemModel))
+			resp, err = client.Post("http://localhost:8098/item", "application/json", payloadReader)
+			So(err, ShouldBeNil)
+			So(resp, ShouldNotBeNil)
+			So(resp.StatusCode, ShouldNotEqual, 200)
+			//responseJson, err := ProcessResponse(resp)
+			So(err, ShouldBeNil)
+			//t.Log(responseJson)
+
+			//create item with login token
+			payloadReader = strings.NewReader(toolkit.JsonString(itemModel))
+			req, err := http.NewRequest("POST", "http://localhost:8098/item", payloadReader)
+			So(err, ShouldBeNil)
+			AddRequestBearer(req, token)
+			resp, err = client.Do(req)
+			So(err, ShouldBeNil)
+			So(resp, ShouldNotBeNil)
+			responseJson, err = ProcessResponse(resp)
+			So(err, ShouldBeNil)
+			//t.Log(responseJson)
+			So(resp.StatusCode, ShouldEqual, 200)
+			itemId := responseJson["Data"].(map[string]interface{})["ID"]
+			So(itemId, ShouldNotBeEmpty)
+
+			//get item without login
+			resp, err = client.Get("http://localhost:8098/item/" + itemId.(string))
+			So(err, ShouldBeNil)
+			So(resp, ShouldNotBeNil)
+			So(resp.StatusCode, ShouldEqual, 200)
+			payload = map[string]interface{}{
+				"skip": 0,
+				"take": 10,
+			}
+			payloadReader = strings.NewReader(toolkit.JsonString(payload))
+			resp, err = client.Post("http://localhost:8098/item/list", "application/json", payloadReader)
+			So(err, ShouldBeNil)
+			So(resp, ShouldNotBeNil)
+			responseJson, err = ProcessResponse(resp)
+			So(err, ShouldBeNil)
+			//t.Log(responseJson)
+			So(resp.StatusCode, ShouldEqual, 200)
+
+			//update item
+			t.Log("update Item")
+			itemModel.ID = itemId.(string)
+			itemModel.ProductName = "LLL1212"
+			itemModel.Price = 13.0
+			itemModel.Visible = true
+			payloadReader = strings.NewReader(toolkit.JsonString(itemModel))
+			request, err := http.NewRequest("PUT", "http://localhost:8098/item/"+itemId.(string), payloadReader)
+			So(err, ShouldBeNil)
+			resp, err = client.Do(request)
+			So(err, ShouldBeNil)
+			So(resp, ShouldNotBeNil)
+			//resp, err = client.("http://localhost:8098/item", "application/json", payloadReader)
+
+			//"delete" item without login
+			request, err = http.NewRequest("DELETE", "http://localhost:8098/item/"+itemId.(string), nil)
+			So(err, ShouldBeNil)
+			resp, err = client.Do(request)
+			So(err, ShouldBeNil)
+			So(resp, ShouldNotBeNil)
+			responseJson, err = ProcessResponse(resp)
+			So(err, ShouldBeNil)
+			//t.Log(responseJson)
+			So(resp.StatusCode, ShouldEqual, 200)
+
+		})
 	})
 }

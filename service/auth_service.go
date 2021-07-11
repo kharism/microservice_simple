@@ -14,7 +14,7 @@ import (
 
 const (
 	// Salt salt for encrypting password
-	Salt = "K4NoS0luT1on"
+	Salt = "asdadszxccx"
 )
 
 // IAuth auth service interface
