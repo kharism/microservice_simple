@@ -1,0 +1,6 @@
+{
+    "uri":"mongodb://mongo:27017",
+    "db":"micro_simple",
+    "address":"0.0.0.0:8098",
+    "jwt_expiration_duration":3600
+}
