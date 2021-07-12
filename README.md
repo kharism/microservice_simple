@@ -15,18 +15,26 @@ docker build -t <image name> ./cmd/<auth_api/transaction_api/ui_api>/.
 
 # Rest API
 - auth
-  /auth/registeruser POST
-  /auth POST
+  * /auth/registeruser POST
+  * /auth POST
 - item
-  /item/list POST
-  /item/{id} GET
-  /item/     POST
-  /item/{id} PUT
-  /item/{id} DELETE
+  * /item/list POST
+  * /item/{id} GET
+  * /item/     POST
+  * /item/{id} PUT
+  * /item/{id} DELETE
 - cart
-  /cart/list      POST
-  /cart/{id}      GET
-  /cart           POST
-  /cart/{id}      PUT
-  /cart/push/{id} PUT
-  /cart/pop/{id}  PUT
+  * /cart/list      POST
+  * /cart/{id}      GET
+  * /cart           POST
+  * /cart/{id}      PUT
+  * /cart/push/{id} PUT
+  * /cart/pop/{id}  PUT
+
+# kubernetes
+kube directory contains kubernetes deployment yaml. It pull from hub.docker.com/kharism/ repository.
+You can use it using ```kubectl apply -f <your yaml file here>```
+
+# testing
+in each directory, except model there are already test file. It uses api_test.json on config directory
+Just cd into that directory and execute ```go test``` to test the package. Make sure your database is running first
