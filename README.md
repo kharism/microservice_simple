@@ -10,7 +10,7 @@ all of those services will use mongodb on localhost:27017. Bydefault they dont a
 
 To dockerize app run on the root directory
 ```
-docker build -t <image name> ./cmd/<auth_api/transaction_api/ui_api>/.
+docker build -t <image name> ./webservice/<auth_api/transaction_api/ui_api>/.
 ```
 
 # Rest API
