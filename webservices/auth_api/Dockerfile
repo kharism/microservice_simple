@@ -18,11 +18,15 @@ RUN cd webservices/auth_api && go build -o auth_api && cp ./auth_api ../../ && c
 
 
 ##################################################
-FROM scratch
+FROM alpine:3.13
 
 COPY --from=builder /app/auth_api /app/auth_api
 
 COPY --from=builder /app/config /app/config
+
+workdir /app
+
+RUN ls && pwd
 
 EXPOSE 8098
 

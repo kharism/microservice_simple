@@ -18,11 +18,15 @@ RUN cd webservices/ui_api && go build -o ui_api && cp ./ui_api ../../ && cp -r c
 
 
 ##################################################
-FROM scratch
+FROM alpine:3.13
 
 COPY --from=builder /app/ui_api /app/ui_api
 
 COPY --from=builder /app/config /app/config
+
+workdir /app
+
+RUN ls && pwd
 
 EXPOSE 8100
 
