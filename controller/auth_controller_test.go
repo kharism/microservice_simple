@@ -3,6 +3,7 @@ package controller
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -21,6 +22,7 @@ import (
 	db "github.com/kharism/microservice_simple/connection"
 	"github.com/kharism/microservice_simple/model"
 	"github.com/kharism/microservice_simple/repository"
+	"github.com/kharism/microservice_simple/service"
 	"github.com/sirupsen/logrus"
 	. "github.com/smartystreets/goconvey/convey"
 	"github.com/spf13/viper"
@@ -37,10 +39,12 @@ func init() {
 	if err != nil {
 		panic(err)
 	}
+	transChan := make(chan model.Transaction, 100)
+	go service.HandleTransaction(transChan)
 	//start webservice
 	authAPI := NewAuth(token)
 	itemAPI := NewItem(token)
-	cartAPI := NewCart(token)
+	cartAPI := NewCart(token, transChan)
 	r := chi.NewRouter()
 
 	logger := logrus.New()
@@ -295,8 +299,12 @@ func TestCarts(t *testing.T) {
 	userModel := model.User{}
 	itemModel := model.Item{}
 	cartModel := model.Cart{}
+	transModel := model.Transaction{}
 	cartRepo := repository.NewCart()
+	//transactionRepo := repository.NewCart()
+	//itemRepo := repository.NewItem()
 	Convey("Clean up", t, func() {
+		//time.Sleep(10 * time.Second)
 		cli1, err := db.NewClient()
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
@@ -305,6 +313,8 @@ func TestCarts(t *testing.T) {
 		_, err = cli1.Database(viper.GetString("db")).Collection(itemModel.TableName()).DeleteMany(ctx, bson.M{})
 		So(err, ShouldBeNil)
 		_, err = cli1.Database(viper.GetString("db")).Collection(cartModel.TableName()).DeleteMany(ctx, bson.M{})
+		So(err, ShouldBeNil)
+		_, err = cli1.Database(viper.GetString("db")).Collection(transModel.TableName()).DeleteMany(ctx, bson.M{})
 		So(err, ShouldBeNil)
 		payload := toolkit.M{}
 		client := &http.Client{}
@@ -317,6 +327,12 @@ func TestCarts(t *testing.T) {
 		So(err, ShouldBeNil)
 		So(resp, ShouldNotBeNil)
 		So(resp.StatusCode, ShouldEqual, 200)
+		payload["Username"] = "admin2"
+		payloadReader = strings.NewReader(toolkit.JsonString(payload))
+		resp, err = client.Post("http://localhost:8098/auth/registeruser", "application/json", payloadReader)
+		payload["Username"] = "admin3"
+		payloadReader = strings.NewReader(toolkit.JsonString(payload))
+		resp, err = client.Post("http://localhost:8098/auth/registeruser", "application/json", payloadReader)
 		//login
 		payload["Username"] = "admin"
 		payload["Password"] = "PasswordXX"
@@ -332,9 +348,36 @@ func TestCarts(t *testing.T) {
 		//t.Log(responseJson)
 		token := responseJson["Data"].(map[string]interface{})["Token"].(string)
 
+		payload["Username"] = "admin2"
+		payloadReader = strings.NewReader(toolkit.JsonString(payload))
+		resp, err = client.Post("http://localhost:8098/auth", "application/json", payloadReader)
+		So(err, ShouldBeNil)
+		So(resp, ShouldNotBeNil)
+		So(resp.StatusCode, ShouldEqual, 200)
+
+		responseJson, err = ProcessResponse(resp)
+		So(err, ShouldBeNil)
+		So(responseJson, ShouldNotBeNil)
+		//t.Log(responseJson)
+		token2 := responseJson["Data"].(map[string]interface{})["Token"].(string)
+
+		payload["Username"] = "admin3"
+		payloadReader = strings.NewReader(toolkit.JsonString(payload))
+		resp, err = client.Post("http://localhost:8098/auth", "application/json", payloadReader)
+		So(err, ShouldBeNil)
+		So(resp, ShouldNotBeNil)
+		So(resp.StatusCode, ShouldEqual, 200)
+
+		responseJson, err = ProcessResponse(resp)
+		So(err, ShouldBeNil)
+		So(responseJson, ShouldNotBeNil)
+		//t.Log(responseJson)
+		token3 := responseJson["Data"].(map[string]interface{})["Token"].(string)
+
 		itemModel.ID = ""
 		itemModel.ProductName = "LLL1212"
 		itemModel.Price = 10.0
+		itemModel.Stock = 200
 		itemModel.Visible = true
 		payloadReader = strings.NewReader(toolkit.JsonString(itemModel))
 		req, err := http.NewRequest("POST", "http://localhost:8098/item", payloadReader)
@@ -347,9 +390,10 @@ func TestCarts(t *testing.T) {
 		So(err, ShouldBeNil)
 		itemId := responseJson["Data"].(map[string]interface{})["ID"].(string)
 		Convey("Test Cart", func() {
+			cartModel = model.Cart{}
 			cartModel.ID = ""
 			cartModel.DelivaryAddress = "adadoiqueiqowe"
-			payloadReader = strings.NewReader(toolkit.JsonString(itemModel))
+			payloadReader = strings.NewReader(toolkit.JsonString(cartModel))
 			req, err := http.NewRequest("POST", "http://localhost:8098/cart", payloadReader)
 			So(err, ShouldBeNil)
 			AddRequestBearer(req, token)
@@ -379,7 +423,7 @@ func TestCarts(t *testing.T) {
 
 			payload = map[string]interface{}{
 				"ItemId": itemId,
-				"Amount": 0,
+				"Amount": 100,
 			}
 			payloadReader = strings.NewReader(toolkit.JsonString(payload))
 			req, err = http.NewRequest("PUT", "http://localhost:8098/cart/push/"+cartId, payloadReader)
@@ -392,19 +436,129 @@ func TestCarts(t *testing.T) {
 			tempCart, err := cartRepo.FindByID(cartId)
 			So(err, ShouldBeNil)
 			So(len(tempCart.Items), ShouldEqual, 1)
+			Convey("Test Pop", func() {
+				payloadReader = strings.NewReader(toolkit.JsonString(payload))
+				req, err = http.NewRequest("PUT", "http://localhost:8098/cart/pop/"+cartId, payloadReader)
+				So(err, ShouldBeNil)
+				AddRequestBearer(req, token)
+				resp, err = client.Do(req)
+				So(err, ShouldBeNil)
+				So(resp, ShouldNotBeNil)
+				tempCart, err = cartRepo.FindByID(cartId)
+				So(err, ShouldBeNil)
+				So(len(tempCart.Items), ShouldEqual, 0)
+				// So(err, ShouldBeNil)
+			})
+			//
+			// Convey("Test Checkout", func() {
+			// 	// test checkout
+			// 	req, err = http.NewRequest("POST", "http://localhost:8098/cart/checkout/"+cartId, nil)
+			// 	So(err, ShouldBeNil)
+			// 	AddRequestBearer(req, token)
+			// 	resp, err = client.Do(req)
+			// 	So(err, ShouldBeNil)
+			// 	So(resp, ShouldNotBeNil)
+			// 	//transactionRepo.Count()
 
-			payloadReader = strings.NewReader(toolkit.JsonString(payload))
-			req, err = http.NewRequest("PUT", "http://localhost:8098/cart/pop/"+cartId, payloadReader)
-			So(err, ShouldBeNil)
-			AddRequestBearer(req, token)
-			resp, err = client.Do(req)
-			So(err, ShouldBeNil)
-			So(resp, ShouldNotBeNil)
-			tempCart, err = cartRepo.FindByID(cartId)
-			So(err, ShouldBeNil)
-			So(len(tempCart.Items), ShouldEqual, 0)
+			// 	responseJson, err = ProcessResponse(resp)
+			// 	So(err, ShouldBeNil)
+			// 	// t.Log(responseJson)
+			// 	transId := responseJson["Data"].(map[string]interface{})["ID"].(string)
+			// 	So(transId, ShouldNotBeEmpty)
+			// 	cc, _ := transactionRepo.Count(map[string]interface{}{})
+			// 	fmt.Println("TRANSID", transId, cc)
+			// 	//time.Sleep(2 * time.Second)
 
-			// So(err, ShouldBeNil)
+			// 	trans, err := transactionRepo.FindByID(transId)
+			// 	So(err, ShouldBeNil)
+			// 	So(trans.Status, ShouldEqual, model.STATUS_DONE)
+			// 	itemNew, err := itemRepo.FindByID(itemId)
+			// 	So(err, ShouldBeNil)
+			// 	So(itemNew.Stock, ShouldEqual, 100)
+			// })
+			Convey("Test Parallel Checkout", func() {
+				//time.Sleep(10)
+				cartModel := model.Cart{}
+				cartModel.ID = ""
+				cartModel.DelivaryAddress = "Address2"
+				payloadReader = strings.NewReader(toolkit.JsonString(cartModel))
+				req, err = http.NewRequest("POST", "http://localhost:8098/cart", payloadReader)
+				So(err, ShouldBeNil)
+				AddRequestBearer(req, token2)
+				resp, err = client.Do(req)
+				So(err, ShouldBeNil)
+				So(resp, ShouldNotBeNil)
+				responseJson, err = ProcessResponse(resp)
+				So(err, ShouldBeNil)
+				// t.Log(responseJson)
+				cartId2 := responseJson["Data"].(map[string]interface{})["ID"].(string)
+
+				cartModel = model.Cart{}
+				cartModel.ID = ""
+				cartModel.DelivaryAddress = "Address3"
+				payloadReader = strings.NewReader(toolkit.JsonString(cartModel))
+				req, err = http.NewRequest("POST", "http://localhost:8098/cart", payloadReader)
+				So(err, ShouldBeNil)
+				AddRequestBearer(req, token3)
+				resp, err = client.Do(req)
+				So(err, ShouldBeNil)
+				So(resp, ShouldNotBeNil)
+				responseJson, err = ProcessResponse(resp)
+				So(err, ShouldBeNil)
+				// t.Log(responseJson)
+				cartId3 := responseJson["Data"].(map[string]interface{})["ID"].(string)
+
+				t.Log("Cart IDs", cartId, cartId2, cartId3)
+
+				payload = map[string]interface{}{
+					"ItemId": itemId,
+					"Amount": 100,
+				}
+				payloadReader = strings.NewReader(toolkit.JsonString(payload))
+				req, err = http.NewRequest("PUT", "http://localhost:8098/cart/push/"+cartId2, payloadReader)
+				So(err, ShouldBeNil)
+				AddRequestBearer(req, token2)
+				resp, err = client.Do(req)
+				So(err, ShouldBeNil)
+				So(resp, ShouldNotBeNil)
+				So(resp.StatusCode, ShouldEqual, 200)
+
+				tempCart, err := cartRepo.FindByID(cartId2)
+				So(err, ShouldBeNil)
+				So(len(tempCart.Items), ShouldEqual, 1)
+
+				payloadReader = strings.NewReader(toolkit.JsonString(payload))
+				req, err = http.NewRequest("PUT", "http://localhost:8098/cart/push/"+cartId3, payloadReader)
+				So(err, ShouldBeNil)
+				AddRequestBearer(req, token3)
+				resp, err = client.Do(req)
+				So(err, ShouldBeNil)
+				So(resp, ShouldNotBeNil)
+				So(resp.StatusCode, ShouldEqual, 200)
+
+				checkoutCarts := []string{cartId, cartId2, cartId3}
+				tokens := []string{token, token2, token3}
+				// failedChan := make(chan string)
+				//wg := sync.WaitGroup{}
+				//wg.Add(1)
+				for idx, i := range checkoutCarts {
+					go func(cartid, token string) {
+						req, _ := http.NewRequest("POST", "http://localhost:8098/cart/checkout/"+cartId, nil)
+						AddRequestBearer(req, token)
+						client.Do(req)
+
+					}(i, tokens[idx])
+				}
+				time.Sleep(10 * time.Second)
+				query := map[string]interface{}{"CartId": map[string]interface{}{"$in": checkoutCarts}}
+				transactions, err := cartRepo.FindAll(query, 0, int64(len(checkoutCarts)))
+				So(err, ShouldBeNil)
+				for _, trans := range transactions {
+					if trans.Status == model.Status(model.STATUS_FAILED) {
+						fmt.Println("transaction id", trans.ID, "Failed")
+					}
+				}
+			})
 		})
 
 	})
