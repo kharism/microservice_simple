@@ -26,6 +26,7 @@ type cartController struct {
 	tokenAuth          *jwtauth.JWTAuth
 	cart               func() service.ICart
 	item               func() service.IItem
+	transaction        func() service.ITransaction
 	transactionChannel chan<- model.Transaction
 	//rkas      func() service.IRKAS
 }
@@ -35,6 +36,7 @@ func NewCart(token *jwtauth.JWTAuth, transactionChannel chan<- model.Transaction
 		tokenAuth:          token,
 		cart:               service.NewCart,
 		item:               service.NewItem,
+		transaction:        service.NewTransaction,
 		transactionChannel: transactionChannel,
 		//rkas:      service.NewRKAS,
 	}
@@ -104,8 +106,13 @@ func (c *cartController) Checkout(w http.ResponseWriter, r *http.Request) {
 		detil.Subtotal = int(i.Item.Price) * detil.Amount
 		transaction.Details = append(transaction.Details, detil)
 	}
+	transaction, err = c.transaction().Save(transaction)
+	if err != nil {
+		util.WriteJSONError(w, err, 500)
+		return
+	}
 	c.transactionChannel <- transaction
-	item := map[string]interface{}{}
+	item := map[string]interface{}{"ID": transaction.ID}
 	util.WriteJSONData(w, item, "Waiting Verification")
 }
 
