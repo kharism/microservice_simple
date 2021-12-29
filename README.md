@@ -26,7 +26,18 @@ docker build -t <image name> ./cmd/<auth_api/transaction_api/ui_api>/.
 - cart
   /cart/list      POST
   /cart/{id}      GET
+  /cart/checkout/{id}
   /cart           POST
   /cart/{id}      PUT
   /cart/push/{id} PUT
   /cart/pop/{id}  PUT
+
+Since We can't do transaction in mongo, we use single routine to handle transaction. Any transaction on cart/checkout will go through single transaction so we can ensure atomicity. In this sample project the transaction order is stored in memory, we should store it in something that is persistent to ensure we don't loose message in case something down. 
+
+In real life production, we should use message queus to make the order persistent and can be consumed by transaction processor. If the order can be handled normally then it goes through. If one of the order cannot be fulfilled then we send notice to the client that the order cannot be fulfilled.
+
+the basic line of process is
+- customer checkout their order
+- the system notify the client that their order will be processed
+- if the order can be processed then continue as usual (wait for customer payment, packing order, send the order to expedition company)
+- if the order can't be processed then notify the order can't be fulfilled

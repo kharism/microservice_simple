@@ -14,6 +14,7 @@ type Item struct {
 	CreatedBy       string     `bson:"CreatedBy" json:"CreatedBy"`
 	CreatedDate     *time.Time `bson:"CreatedDate" json:"CreatedDate"`
 	UpdatedBy       string     `bson:"UpdatedBy" json:"UpdatedBy"`
+	Stock           int        `bson:"Stock" json:"Stock"`
 	LastUpdatedDate *time.Time `bson:"LastUpdatedDate" json:"LastUpdatedDate"`
 }
 

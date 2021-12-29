@@ -17,22 +17,25 @@ type ICartRestAPI interface {
 	SaveCart(w http.ResponseWriter, r *http.Request)
 	AddItemToCart(w http.ResponseWriter, r *http.Request)
 	RemoveItemFromCart(w http.ResponseWriter, r *http.Request)
+	Checkout(w http.ResponseWriter, r *http.Request)
 	//HideItem(w http.ResponseWriter, r *http.Request)
 	Register() http.Handler
 }
 
 type cartController struct {
-	tokenAuth *jwtauth.JWTAuth
-	cart      func() service.ICart
-	item      func() service.IItem
+	tokenAuth          *jwtauth.JWTAuth
+	cart               func() service.ICart
+	item               func() service.IItem
+	transactionChannel chan<- model.Transaction
 	//rkas      func() service.IRKAS
 }
 
-func NewCart(token *jwtauth.JWTAuth) ICartRestAPI {
+func NewCart(token *jwtauth.JWTAuth, transactionChannel chan<- model.Transaction) ICartRestAPI {
 	return &cartController{
-		tokenAuth: token,
-		cart:      service.NewCart,
-		item:      service.NewItem,
+		tokenAuth:          token,
+		cart:               service.NewCart,
+		item:               service.NewItem,
+		transactionChannel: transactionChannel,
 		//rkas:      service.NewRKAS,
 	}
 }
@@ -75,6 +78,35 @@ func (c *cartController) GetCarts(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	util.WriteJSONDataWithTotal(w, items, count)
+}
+
+// Checkout cart
+func (c *cartController) Checkout(w http.ResponseWriter, r *http.Request) {
+	id := util.URLParam(r, "id")
+	cart, err := c.cart().FindById(id)
+	if err != nil {
+		util.WriteJSONError(w, err, 500)
+		return
+	}
+	userID, err := util.GetClaimStringFromJWT(r, jwtKeyID)
+	if err != nil {
+		util.WriteJSONError(w, err, 500)
+		return
+	}
+	transaction := model.Transaction{}
+	transaction.UserId = userID
+	transaction.CartId = id
+	transaction.Status = model.STATUS_CHECKING
+	for _, i := range cart.Items {
+		detil := model.TransactionDetail{}
+		detil.ItemId = i.Item.ID
+		detil.Amount = int(i.Ammount)
+		detil.Subtotal = int(i.Item.Price) * detil.Amount
+		transaction.Details = append(transaction.Details, detil)
+	}
+	c.transactionChannel <- transaction
+	item := map[string]interface{}{}
+	util.WriteJSONData(w, item, "Waiting Verification")
 }
 
 // get carts by id
@@ -190,6 +222,7 @@ func (c *cartController) Register() http.Handler {
 		r.Use(jwtauth.Verifier(c.tokenAuth))
 		r.Post("/", c.SaveCart)
 		r.Put("/{id}", c.SaveCart)
+		r.Post("/checkout/{id}", c.Checkout)
 		r.Put("/push/{id}", c.AddItemToCart)
 		r.Put("/pop/{id}", c.RemoveItemFromCart)
 		//r.Delete("/{id}", c.HideItem)

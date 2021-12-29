@@ -9,6 +9,8 @@ import (
 	"github.com/go-chi/cors"
 	"github.com/go-chi/jwtauth"
 	"github.com/kharism/microservice_simple/controller"
+	"github.com/kharism/microservice_simple/model"
+	"github.com/kharism/microservice_simple/service"
 	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
@@ -39,13 +41,14 @@ func init() {
 	if mongourl != "" {
 		viper.Set("uri", mongourl)
 	}
-
+	transactionChan := make(chan model.Transaction, 100)
+	go service.HandleTransaction(transactionChan)
 	// Log as JSON instead of the default ASCII formatter.
 	log.SetFormatter(&log.TextFormatter{
 		ForceColors:   debugging,
 		FullTimestamp: true,
 	})
-	cartAPI = controller.NewCart(token)
+	cartAPI = controller.NewCart(token, transactionChan)
 }
 
 func main() {
