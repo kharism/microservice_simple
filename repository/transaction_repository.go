@@ -88,7 +88,7 @@ func (r *transactionRepo) FindByID(id string) (model.Transaction, error) {
 	}
 	defer mongoCli.Disconnect(ctx)
 	db := mongoCli.Database(viper.GetString("db"))
-	query := bson.M{}
+	query := bson.M{"_id": id}
 
 	err = db.Collection(item.TableName()).FindOne(ctx, query).Decode(&item)
 	if err != nil {
