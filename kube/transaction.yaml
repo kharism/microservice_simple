@@ -1,10 +1,10 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: transaction_api
+  name: transaction-api
 spec:
   selector:
-    app: transaction_api
+    app: transaction-api
   ports:
     - port: 8099
       targetPort: 8099
@@ -13,23 +13,23 @@ spec:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: transaction_api
+  name: transaction-api
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: transaction_api
+      app: transaction-api
   template:
     metadata:
       labels:
-        app: transaction_api
+        app: transaction-api
     spec:
       containers:
-        - name: transaction_api
+        - name: transaction-api
           image: kharism/transaction_api
           ports:
             - containerPort: 8099
           env:
-            - name: MONGO_URL
+            - name: MONGO_URI
               value: mongodb://mongo:27017/
           imagePullPolicy: Always

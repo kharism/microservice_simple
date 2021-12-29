@@ -10,19 +10,19 @@ all of those services will use mongodb on localhost:27017. Bydefault they dont a
 
 To dockerize app run on the root directory
 ```
-docker build -t <image name> ./cmd/<auth_api/transaction_api/ui_api>/.
+docker build -t <image name> ./webservice/<auth_api/transaction_api/ui_api>/.
 ```
 
 # Rest API
 - auth
-  /auth/registeruser POST
-  /auth POST
+  * /auth/registeruser POST
+  * /auth POST
 - item
-  /item/list POST
-  /item/{id} GET
-  /item/     POST
-  /item/{id} PUT
-  /item/{id} DELETE
+  * /item/list POST
+  * /item/{id} GET
+  * /item/     POST
+  * /item/{id} PUT
+  * /item/{id} DELETE
 - cart
   /cart/list      POST
   /cart/{id}      GET
@@ -31,6 +31,14 @@ docker build -t <image name> ./cmd/<auth_api/transaction_api/ui_api>/.
   /cart/{id}      PUT
   /cart/push/{id} PUT
   /cart/pop/{id}  PUT
+
+# kubernetes
+kube directory contains kubernetes deployment yaml. It pull from hub.docker.com/kharism/ repository.
+You can use it using ```kubectl apply -f <your yaml file here>```
+
+# testing
+in each directory, except model there are already test file. It uses api_test.json on config directory
+Just cd into that directory and execute ```go test``` to test the package. Make sure your database is running first
 
 Since We can't do transaction in mongo, we use single routine to handle transaction. Any transaction on cart/checkout will go through single transaction so we can ensure atomicity. In this sample project the transaction order is stored in memory, we should store it in something that is persistent to ensure we don't loose message in case something down. 
 
@@ -41,3 +49,4 @@ the basic line of process is
 - the system notify the client that their order will be processed
 - if the order can be processed then continue as usual (wait for customer payment, packing order, send the order to expedition company)
 - if the order can't be processed then notify the order can't be fulfilled
+
